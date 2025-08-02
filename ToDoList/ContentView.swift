@@ -6,81 +6,119 @@
 //
 
 import SwiftUI
-import CoreData
 
 struct ContentView: View {
     @Environment(\.managedObjectContext) private var viewContext
-
-    @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \Item.timestamp, ascending: true)],
-        animation: .default)
-    private var items: FetchedResults<Item>
+    @StateObject private var vm = SimpleTaskListViewModel()
 
     var body: some View {
         NavigationView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp!, formatter: itemFormatter)")
-                    } label: {
-                        Text(item.timestamp!, formatter: itemFormatter)
+            VStack {
+                if vm.isLoading {
+                    ProgressView("Загрузка...")
+                        .padding()
+                }
+                if let error = vm.errorMessage {
+                    Text("Ошибка: \(error)").foregroundColor(.red)
+                }
+                TextField("Поиск", text: $vm.searchText)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .padding()
+                    .onChange(of: vm.searchText) { _ in
+                        vm.reload()
+                    }
+
+                List {
+                    ForEach(vm.tasks, id: \.objectID) { task in
+                        HStack {
+                            VStack(alignment: .leading) {
+                                Text(task.title ?? "Без названия").bold()
+                                if let detail = task.detail, !detail.isEmpty {
+                                    Text(detail).font(.caption)
+                                }
+                                if let date = task.createdAt {
+                                    Text(date, formatter: itemFormatter)
+                                        .font(.caption2)
+                                }
+                            }
+                            Spacer()
+                            Image(systemName: task.completed ? "checkmark.circle.fill" : "circle")
+                                .onTapGesture {
+                                    vm.toggle(task: task)
+                                }
+                        }
+                    }
+                    .onDelete { idx in
+                        for i in idx {
+                            let t = vm.tasks[i]
+                            vm.delete(task: t)
+                        }
                     }
                 }
-                .onDelete(perform: deleteItems)
             }
+            .navigationTitle("Задачи")
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
-                }
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
-                    }
+                Button(action: {
+                    vm.add(title: "Новая задача", detail: "Описание")
+                }) {
+                    Image(systemName: "plus")
                 }
             }
-            Text("Select an item")
-        }
-    }
-
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(context: viewContext)
-            newItem.timestamp = Date()
-
-            do {
-                try viewContext.save()
-            } catch {
-                // Replace this implementation with code to handle the error appropriately.
-                // fatalError() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
-                let nsError = error as NSError
-                fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
-            }
-        }
-    }
-
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            offsets.map { items[$0] }.forEach(viewContext.delete)
-
-            do {
-                try viewContext.save()
-            } catch {
-                // Replace this implementation with code to handle the error appropriately.
-                // fatalError() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
-                let nsError = error as NSError
-                fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
+            .onAppear {
+                vm.initialLoad()
             }
         }
     }
 }
 
 private let itemFormatter: DateFormatter = {
-    let formatter = DateFormatter()
-    formatter.dateStyle = .short
-    formatter.timeStyle = .medium
-    return formatter
+    let f = DateFormatter()
+    f.dateStyle = .short
+    f.timeStyle = .short
+    return f
 }()
 
-#Preview {
-    ContentView().environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
+@MainActor
+class SimpleTaskListViewModel: ObservableObject {
+    @Published var tasks: [Task] = []
+    @Published var searchText: String = ""
+    @Published var isLoading = false
+    @Published var errorMessage: String?
+
+    private let repo = TaskRepository()
+
+    func initialLoad() {
+        isLoading = true
+        repo.loadInitialIfNeeded { [weak self] error in
+            self?.isLoading = false
+            if let e = error {
+                self?.errorMessage = e.localizedDescription
+            }
+            self?.reload()
+        }
+    }
+
+    func reload() {
+        do {
+            tasks = try repo.fetchAll(search: searchText)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func toggle(task: Task) {
+        repo.toggleCompleted(task: task)
+        reload()
+    }
+
+    func delete(task: Task) {
+        repo.delete(task: task)
+        reload()
+    }
+
+    func add(title: String, detail: String) {
+        repo.add(title: title, detail: detail)
+        reload()
+    }
 }
+

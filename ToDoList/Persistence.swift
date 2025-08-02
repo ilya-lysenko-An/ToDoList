@@ -10,48 +10,68 @@ import CoreData
 struct PersistenceController {
     static let shared = PersistenceController()
 
-    @MainActor
+    // Для превью/тестов: in-memory store
     static let preview: PersistenceController = {
-        let result = PersistenceController(inMemory: true)
-        let viewContext = result.container.viewContext
-        for _ in 0..<10 {
-            let newItem = Item(context: viewContext)
-            newItem.timestamp = Date()
+        let controller = PersistenceController(inMemory: true)
+        let context = controller.container.viewContext
+
+        // Можно подставить пару тестовых задач
+        for i in 1...5 {
+            let task = Task(context: context)
+            task.id = Int64(i)
+            task.title = "Пример \(i)"
+            task.detail = "Описание задачи \(i)"
+            task.createdAt = Date()
+            task.completed = (i % 2 == 0)
         }
         do {
-            try viewContext.save()
+            try context.save()
         } catch {
-            // Replace this implementation with code to handle the error appropriately.
-            // fatalError() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
-            let nsError = error as NSError
-            fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
+            print("Preview save error: \(error)")
         }
-        return result
+        return controller
     }()
 
     let container: NSPersistentContainer
 
+    // Инициализация: on-disk по умолчанию, или in-memory если нужно
     init(inMemory: Bool = false) {
-        container = NSPersistentContainer(name: "ToDoList")
+        container = NSPersistentContainer(name: "ToDoList") // имя должно совпадать с .xcdatamodeld
         if inMemory {
-            container.persistentStoreDescriptions.first!.url = URL(fileURLWithPath: "/dev/null")
+            let desc = NSPersistentStoreDescription()
+            desc.type = NSInMemoryStoreType
+            container.persistentStoreDescriptions = [desc]
         }
-        container.loadPersistentStores(completionHandler: { (storeDescription, error) in
+        container.loadPersistentStores { storeDescription, error in
             if let error = error as NSError? {
-                // Replace this implementation with code to handle the error appropriately.
-                // fatalError() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
-
-                /*
-                 Typical reasons for an error here include:
-                 * The parent directory does not exist, cannot be created, or disallows writing.
-                 * The persistent store is not accessible, due to permissions or data protection when the device is locked.
-                 * The device is out of space.
-                 * The store could not be migrated to the current model version.
-                 Check the error message to determine what the actual problem was.
-                 */
-                fatalError("Unresolved error \(error), \(error.userInfo)")
+                // Во время разработки можно логировать, но не падать в проде
+                fatalError("Unresolved CoreData error: \(error), \(error.userInfo)")
             }
-        })
+        }
+        // Чтобы изменения из background контекстов попадали в viewContext
         container.viewContext.automaticallyMergesChangesFromParent = true
+        container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+    }
+
+    // Удобный метод для сохранения контекста (без блокировки)
+    func saveContext(context: NSManagedObjectContext? = nil) {
+        let ctx = context ?? container.viewContext
+        if ctx.hasChanges {
+            ctx.perform {
+                do {
+                    try ctx.save()
+                } catch {
+                    print("CoreData save error: \(error)")
+                }
+            }
+        }
+    }
+
+    // Фоновый контекст для мутаций
+    func newBackgroundContext() -> NSManagedObjectContext {
+        let bg = container.newBackgroundContext()
+        bg.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+        return bg
     }
 }
+
