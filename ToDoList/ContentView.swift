@@ -9,27 +9,27 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(\.managedObjectContext) private var viewContext
-    @StateObject private var vm = SimpleTaskListViewModel()
+    @StateObject private var taskListViewModel = SimpleTaskListViewModel()
 
     var body: some View {
         NavigationView {
             VStack {
-                if vm.isLoading {
+                if taskListViewModel.isLoading {
                     ProgressView("Загрузка...")
                         .padding()
                 }
-                if let error = vm.errorMessage {
+                if let error = taskListViewModel.errorMessage {
                     Text("Ошибка: \(error)").foregroundColor(.red)
                 }
-                TextField("Поиск", text: $vm.searchText)
+                TextField("Поиск", text: $taskListViewModel.searchText)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
                     .padding()
-                    .onChange(of: vm.searchText) { _ in
-                        vm.reload()
+                    .onChange(of: taskListViewModel.searchText) { _ in
+                        taskListViewModel.reload()
                     }
 
                 List {
-                    ForEach(vm.tasks, id: \.objectID) { task in
+                    ForEach(taskListViewModel.tasks, id: \.objectID) { task in
                         HStack {
                             VStack(alignment: .leading) {
                                 Text(task.title ?? "Без названия").bold()
@@ -44,14 +44,14 @@ struct ContentView: View {
                             Spacer()
                             Image(systemName: task.completed ? "checkmark.circle.fill" : "circle")
                                 .onTapGesture {
-                                    vm.toggle(task: task)
+                                    taskListViewModel.toggle(task: task)
                                 }
                         }
                     }
                     .onDelete { idx in
                         for i in idx {
-                            let t = vm.tasks[i]
-                            vm.delete(task: t)
+                            let t = taskListViewModel.tasks[i]
+                            taskListViewModel.delete(task: t)
                         }
                     }
                 }
@@ -59,23 +59,23 @@ struct ContentView: View {
             .navigationTitle("Задачи")
             .toolbar {
                 Button(action: {
-                    vm.add(title: "Новая задача", detail: "Описание")
+                    taskListViewModel.add(title: "Новая задача", detail: "Описание")
                 }) {
                     Image(systemName: "plus")
                 }
             }
             .onAppear {
-                vm.initialLoad()
+                taskListViewModel.initialLoad()
             }
         }
     }
 }
 
 private let itemFormatter: DateFormatter = {
-    let f = DateFormatter()
-    f.dateStyle = .short
-    f.timeStyle = .short
-    return f
+    let taskDateFormatter = DateFormatter()
+    taskDateFormatter.dateStyle = .short
+    taskDateFormatter.timeStyle = .short
+    return taskDateFormatter
 }()
 
 @MainActor
@@ -91,8 +91,8 @@ class SimpleTaskListViewModel: ObservableObject {
         isLoading = true
         repo.loadInitialIfNeeded { [weak self] error in
             self?.isLoading = false
-            if let e = error {
-                self?.errorMessage = e.localizedDescription
+            if let error = error {
+                self?.errorMessage = error.localizedDescription
             }
             self?.reload()
         }
@@ -120,5 +120,12 @@ class SimpleTaskListViewModel: ObservableObject {
         repo.add(title: title, detail: detail)
         reload()
     }
+    
+    func update(task: Task, title: String, detail: String, comment: String?, completed: Bool) {
+        repo.update(task: task, title: title, detail: detail, comment: comment, completed: completed) { [weak self] in
+            self?.reload()
+        }
+    }
+
 }
 

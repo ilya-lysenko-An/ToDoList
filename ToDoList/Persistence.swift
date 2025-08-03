@@ -16,14 +16,14 @@ struct PersistenceController {
         let context = controller.container.viewContext
 
         // Можно подставить пару тестовых задач
-        for i in 1...5 {
+       /* for i in 1...5 {
             let task = Task(context: context)
             task.id = Int64(i)
             task.title = "Пример \(i)"
             task.detail = "Описание задачи \(i)"
             task.createdAt = Date()
             task.completed = (i % 2 == 0)
-        }
+        } */
         do {
             try context.save()
         } catch {
@@ -38,9 +38,9 @@ struct PersistenceController {
     init(inMemory: Bool = false) {
         container = NSPersistentContainer(name: "ToDoList") // имя должно совпадать с .xcdatamodeld
         if inMemory {
-            let desc = NSPersistentStoreDescription()
-            desc.type = NSInMemoryStoreType
-            container.persistentStoreDescriptions = [desc]
+            let description = NSPersistentStoreDescription()
+            description.type = NSInMemoryStoreType
+            container.persistentStoreDescriptions = [description]
         }
         container.loadPersistentStores { storeDescription, error in
             if let error = error as NSError? {
@@ -69,9 +69,9 @@ struct PersistenceController {
 
     // Фоновый контекст для мутаций
     func newBackgroundContext() -> NSManagedObjectContext {
-        let bg = container.newBackgroundContext()
-        bg.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
-        return bg
+        let background = container.newBackgroundContext()
+        background.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+        return background
     }
 }
 

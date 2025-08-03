@@ -23,8 +23,8 @@ class APIClient {
             return
         }
         URLSession.shared.dataTask(with: url) { data, _, error in
-            if let e = error {
-                completion(.failure(e))
+            if let error = error {
+                completion(.failure(error))
                 return
             }
             guard let data = data else {

@@ -35,10 +35,10 @@ class TaskRepository {
                 APIClient().fetchTodos { result in
                     switch result {
                     case .success(let todos):
-                        let bg = self.container.newBackgroundContext()
-                        bg.perform {
+                        let background = self.container.newBackgroundContext()
+                        background.perform {
                             for t in todos {
-                                let task = Task(context: bg)
+                                let task = Task(context: background)
                                 task.id = Int64(t.id)
                                 task.title = t.todo
                                 task.detail = ""
@@ -46,7 +46,7 @@ class TaskRepository {
                                 task.completed = t.completed
                             }
                             do {
-                                try bg.save()
+                                try background.save()
                                 DispatchQueue.main.async { completion(nil) }
                             } catch {
                                 DispatchQueue.main.async { completion(error) }
@@ -72,35 +72,58 @@ class TaskRepository {
     }
 
     func toggleCompleted(task: Task) {
-        let bg = container.newBackgroundContext()
-        bg.perform {
-            if let t = try? bg.existingObject(with: task.objectID) as? Task {
+        let background = container.newBackgroundContext()
+        background.perform {
+            if let t = try? background.existingObject(with: task.objectID) as? Task {
                 t.completed.toggle()
-                try? bg.save()
+                try? background.save()
             }
         }
     }
 
     func delete(task: Task) {
-        let bg = container.newBackgroundContext()
-        bg.perform {
-            if let t = try? bg.existingObject(with: task.objectID) {
-                bg.delete(t)
-                try? bg.save()
+        let background = container.newBackgroundContext()
+        background.perform {
+            if let t = try? background.existingObject(with: task.objectID) {
+                background.delete(t)
+                try? background.save()
             }
         }
     }
 
     func add(title: String, detail: String) {
-        let bg = container.newBackgroundContext()
-        bg.perform {
-            let task = Task(context: bg)
+        let background = container.newBackgroundContext()
+        background.perform {
+            let task = Task(context: background)
             task.id = Int64(Date().timeIntervalSince1970)
             task.title = title
             task.detail = detail
             task.createdAt = Date()
             task.completed = false
-            try? bg.save()
+            try? background.save()
         }
     }
+    
+    func update(task: Task, title: String, detail: String, comment: String?, completed: Bool, completion: @escaping () -> Void) {
+        let background = container.newBackgroundContext()
+        background.perform {
+            if let t = try? background.existingObject(with: task.objectID) as? Task {
+                t.title = title
+                t.detail = detail
+                t.comment = comment
+                t.completed = completed
+                // сохраняем дату изменения, если нужно (можно не менять createdAt)
+                do {
+                    try background.save()
+                } catch {
+                    // логирование, но продолжаем
+                    print("Update save error: \(error)")
+                }
+            }
+            DispatchQueue.main.async {
+                completion()
+            }
+        }
+    }
+
 }
