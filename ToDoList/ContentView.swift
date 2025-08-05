@@ -10,6 +10,8 @@ import SwiftUI
 struct ContentView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @StateObject private var taskListViewModel = SimpleTaskListViewModel()
+    @State private var selectedTaskForEditing: Task?
+    @State private var isEditingSheetPresented = false
 
     var body: some View {
         NavigationView {
@@ -30,24 +32,29 @@ struct ContentView: View {
 
                 List {
                     ForEach(taskListViewModel.tasks, id: \.objectID) { task in
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text(task.title ?? "Без названия").bold()
-                                if let detail = task.detail, !detail.isEmpty {
-                                    Text(detail).font(.caption)
+                        Button {
+                            selectedTaskForEditing = task
+                            isEditingSheetPresented = true
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading) {
+                                    Text(task.title ?? "Без названия").bold()
+                                    if let detail = task.detail, !detail.isEmpty {
+                                        Text(detail).font(.caption)
+                                    }
+                                    if let date = task.createdAt {
+                                        Text(date, formatter: itemFormatter)
+                                            .font(.caption2)
+                                    }
                                 }
-                                if let date = task.createdAt {
-                                    Text(date, formatter: itemFormatter)
-                                        .font(.caption2)
-                                }
+                                Spacer()
+                                Image(systemName: task.completed ? "checkmark.circle.fill" : "circle")
+                                    .foregroundColor(task.completed ? .green : .gray)
                             }
-                            Spacer()
-                            Image(systemName: task.completed ? "checkmark.circle.fill" : "circle")
-                                .onTapGesture {
-                                    taskListViewModel.toggle(task: task)
-                                }
                         }
+                        .buttonStyle(PlainButtonStyle())
                     }
+
                     .onDelete { idx in
                         for i in idx {
                             let t = taskListViewModel.tasks[i]
@@ -67,6 +74,20 @@ struct ContentView: View {
             .onAppear {
                 taskListViewModel.initialLoad()
             }
+            .sheet(isPresented: $isEditingSheetPresented) {
+                if let taskToEdit = selectedTaskForEditing {
+                    TaskEditSheetView(task: taskToEdit) { updatedTask, newTitle, newDetail, newComment, newCompleted in
+                        taskListViewModel.update(
+                            task: updatedTask,
+                            title: newTitle,
+                            detail: newDetail,
+                            comment: newComment,
+                            completed: newCompleted
+                        )
+                    }
+                }
+            }
+
         }
     }
 }
@@ -78,54 +99,4 @@ private let itemFormatter: DateFormatter = {
     return taskDateFormatter
 }()
 
-@MainActor
-class SimpleTaskListViewModel: ObservableObject {
-    @Published var tasks: [Task] = []
-    @Published var searchText: String = ""
-    @Published var isLoading = false
-    @Published var errorMessage: String?
-
-    private let repo = TaskRepository()
-
-    func initialLoad() {
-        isLoading = true
-        repo.loadInitialIfNeeded { [weak self] error in
-            self?.isLoading = false
-            if let error = error {
-                self?.errorMessage = error.localizedDescription
-            }
-            self?.reload()
-        }
-    }
-
-    func reload() {
-        do {
-            tasks = try repo.fetchAll(search: searchText)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    func toggle(task: Task) {
-        repo.toggleCompleted(task: task)
-        reload()
-    }
-
-    func delete(task: Task) {
-        repo.delete(task: task)
-        reload()
-    }
-
-    func add(title: String, detail: String) {
-        repo.add(title: title, detail: detail)
-        reload()
-    }
-    
-    func update(task: Task, title: String, detail: String, comment: String?, completed: Bool) {
-        repo.update(task: task, title: title, detail: detail, comment: comment, completed: completed) { [weak self] in
-            self?.reload()
-        }
-    }
-
-}
 

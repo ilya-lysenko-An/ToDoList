@@ -15,15 +15,6 @@ struct PersistenceController {
         let controller = PersistenceController(inMemory: true)
         let context = controller.container.viewContext
 
-        // Можно подставить пару тестовых задач
-       /* for i in 1...5 {
-            let task = Task(context: context)
-            task.id = Int64(i)
-            task.title = "Пример \(i)"
-            task.detail = "Описание задачи \(i)"
-            task.createdAt = Date()
-            task.completed = (i % 2 == 0)
-        } */
         do {
             try context.save()
         } catch {
