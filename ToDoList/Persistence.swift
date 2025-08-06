@@ -10,7 +10,6 @@ import CoreData
 struct PersistenceController {
     static let shared = PersistenceController()
 
-    // Для превью/тестов: in-memory store
     static let preview: PersistenceController = {
         let controller = PersistenceController(inMemory: true)
         let context = controller.container.viewContext
@@ -25,9 +24,8 @@ struct PersistenceController {
 
     let container: NSPersistentContainer
 
-    // Инициализация: on-disk по умолчанию, или in-memory если нужно
     init(inMemory: Bool = false) {
-        container = NSPersistentContainer(name: "ToDoList") // имя должно совпадать с .xcdatamodeld
+        container = NSPersistentContainer(name: "ToDoList")
         if inMemory {
             let description = NSPersistentStoreDescription()
             description.type = NSInMemoryStoreType
@@ -35,16 +33,13 @@ struct PersistenceController {
         }
         container.loadPersistentStores { storeDescription, error in
             if let error = error as NSError? {
-                // Во время разработки можно логировать, но не падать в проде
                 fatalError("Unresolved CoreData error: \(error), \(error.userInfo)")
             }
         }
-        // Чтобы изменения из background контекстов попадали в viewContext
         container.viewContext.automaticallyMergesChangesFromParent = true
         container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
     }
 
-    // Удобный метод для сохранения контекста (без блокировки)
     func saveContext(context: NSManagedObjectContext? = nil) {
         let ctx = context ?? container.viewContext
         if ctx.hasChanges {
@@ -57,8 +52,7 @@ struct PersistenceController {
             }
         }
     }
-
-    // Фоновый контекст для мутаций
+    
     func newBackgroundContext() -> NSManagedObjectContext {
         let background = container.newBackgroundContext()
         background.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy

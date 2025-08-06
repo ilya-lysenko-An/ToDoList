@@ -11,7 +11,7 @@ struct ContentView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @StateObject private var taskListViewModel = SimpleTaskListViewModel()
     @State private var selectedTaskForEditing: Task?
-    @State private var isEditingSheetPresented = false
+    @State private var selectedTask: Task?
 
     var body: some View {
         NavigationView {
@@ -34,7 +34,6 @@ struct ContentView: View {
                     ForEach(taskListViewModel.tasks, id: \.objectID) { task in
                         Button {
                             selectedTaskForEditing = task
-                            isEditingSheetPresented = true
                         } label: {
                             HStack {
                                 VStack(alignment: .leading) {
@@ -74,20 +73,20 @@ struct ContentView: View {
             .onAppear {
                 taskListViewModel.initialLoad()
             }
-            .sheet(isPresented: $isEditingSheetPresented) {
-                if let taskToEdit = selectedTaskForEditing {
-                    TaskEditSheetView(task: taskToEdit) { updatedTask, newTitle, newDetail, newComment, newCompleted in
-                        taskListViewModel.update(
-                            task: updatedTask,
-                            title: newTitle,
-                            detail: newDetail,
-                            comment: newComment,
-                            completed: newCompleted
-                        )
-                    }
+            .sheet(item: $selectedTaskForEditing) { taskToEdit in
+                TaskEditSheetView(
+                    task: taskToEdit
+                ) { updatedTask, newTitle, newDetail, newComment, newCompleted in
+                    taskListViewModel.update(
+                        task: updatedTask,
+                        title: newTitle,
+                        detail: newDetail,
+                        comment: newComment,
+                        completed: newCompleted
+                    )
+                    selectedTaskForEditing = nil 
                 }
             }
-
         }
     }
 }

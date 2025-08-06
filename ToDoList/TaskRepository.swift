@@ -11,7 +11,6 @@ import CoreData
 class TaskRepository {
     private let viewContext = PersistenceController.shared.container.viewContext
 
-    // Загрузка всех задач с поиском
     func fetchAll(search: String) throws -> [Task] {
         let request: NSFetchRequest<Task> = Task.fetchRequest()
         if !search.isEmpty {
@@ -21,19 +20,16 @@ class TaskRepository {
         return try viewContext.fetch(request)
     }
 
-    // Переключение статуса "выполнено"
     func toggleCompleted(task: Task) {
         task.completed.toggle()
         save()
     }
 
-    // Удаление задачи
     func delete(task: Task) {
         viewContext.delete(task)
         save()
     }
 
-    // Добавление новой задачи
     func add(title: String, detail: String, completed: Bool = false) {
         let newTask = Task(context: viewContext)
         newTask.title = title
@@ -43,9 +39,7 @@ class TaskRepository {
         save()
     }
 
-
-    // Обновление существующей задачи
-    func update(task: Task, title: String, detail: String, comment: String?, completed: Bool, completion: @escaping () -> Void) {
+   func update(task: Task, title: String, detail: String, comment: String?, completed: Bool, completion: @escaping () -> Void) {
         task.title = title
         task.detail = detail
         task.comment = comment
@@ -54,7 +48,6 @@ class TaskRepository {
         completion()
     }
 
-    // Сохранение изменений
     private func save() {
         do {
             try viewContext.save()
@@ -63,7 +56,6 @@ class TaskRepository {
         }
     }
 
-    // Начальная загрузка примера, если база пустая
     func loadInitialIfNeeded(completion: @escaping (Error?) -> Void) {
         let request: NSFetchRequest<Task> = Task.fetchRequest()
         
@@ -91,6 +83,18 @@ class TaskRepository {
             completion(error)
         }
     }
-
+    
+    func clearAll() {
+        let context = PersistenceController.shared.container.viewContext
+        let fetchRequest: NSFetchRequest<NSFetchRequestResult> = Task.fetchRequest()
+        let deleteRequest = NSBatchDeleteRequest(fetchRequest: fetchRequest)
+        
+        do {
+            try context.execute(deleteRequest)
+            try context.save()
+        } catch {
+            print("Ошибка при очистке базы: \(error)")
+        }
+    }
 }
 

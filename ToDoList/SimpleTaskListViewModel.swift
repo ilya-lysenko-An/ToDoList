@@ -10,12 +10,14 @@ import CoreData
 
 @MainActor
 class SimpleTaskListViewModel: ObservableObject {
+
     @Published var tasks: [Task] = []
     @Published var searchText: String = ""
     @Published var isLoading = false
     @Published var errorMessage: String?
 
-    private let repo = TaskRepository()
+    public let repo = TaskRepository()
+
 
     func initialLoad() {
         isLoading = true
