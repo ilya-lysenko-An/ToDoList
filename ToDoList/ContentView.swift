@@ -88,6 +88,7 @@ struct ContentView: View {
                 }
             }
         }
+        .hideKeyboardOnTap()
     }
 }
 
@@ -97,5 +98,19 @@ private let itemFormatter: DateFormatter = {
     taskDateFormatter.timeStyle = .short
     return taskDateFormatter
 }()
+
+extension View {
+    func hideKeyboardOnTap() -> some View {
+        self.gesture(
+            TapGesture()
+                .onEnded { _ in
+                    UIApplication.shared.sendAction(
+                        #selector(UIResponder.resignFirstResponder),
+                        to: nil, from: nil, for: nil
+                    )
+                }
+        )
+    }
+}
 
 
